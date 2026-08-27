@@ -1,0 +1,51 @@
+name: Check Walmart Orders
+
+on:
+  schedule:
+    # Every 5 minutes. GitHub may occasionally delay a scheduled run by a
+    # few minutes during high platform load — that's a GitHub-side limit,
+    # not a bug in this workflow.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      test_notification:
+        description: "Send a test Pushover push and exit (no Walmart API call)"
+        required: false
+        default: "false"
+
+# Prevent two runs from racing to read/write state/seen_orders.json if a run
+# ever takes longer than 5 minutes.
+concurrency:
+  group: walmart-order-check
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  check-orders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Run order check
+        env:
+          WALMART_CLIENT_ID: ${{ secrets.WALMART_CLIENT_ID }}
+          WALMART_CLIENT_SECRET: ${{ secrets.WALMART_CLIENT_SECRET }}
+          PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
+          PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
+          TEST_NOTIFICATION: ${{ github.event.inputs.test_notification }}
+        run: python3 scripts/check_orders.py
+
+      - name: Commit updated state
+        run: |
+          git config user.name "walmart-order-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add state/seen_orders.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Update order-check state [skip ci]"
+            git push
+          else
+            echo "No state change to commit."
+          fi
