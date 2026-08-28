@@ -95,7 +95,7 @@ new `[buybox]` or `[shipments]` log lines, this is almost certainly why.
 In your GitHub repo: **Settings → Secrets and variables → Actions → New
 repository secret**. Add these four:
 
-| Secret name             | Value                                     |
+| Secret name             | Value                                      |
 |--------------------------|---------------------------------------------|
 | `WALMART_CLIENT_ID`      | Your Walmart Marketplace API Client ID      |
 | `WALMART_CLIENT_SECRET`  | Your Walmart Marketplace API Client Secret  |
@@ -108,9 +108,27 @@ itself is public.
 ### 3. Test it
 
 Go to the **Actions** tab → **Check Walmart Orders** workflow → **Run
-workflow**. Set `test_notification` to `true` and run it. You should get a
-push notification with the cash-register sound within a few seconds. If
-you don't:
+workflow**. Pick a `test_type` and run it — this sends one realistic
+sample push and exits without calling the Walmart API at all, so you can
+check wording and sound for each kind of notification on demand instead
+of waiting for a real event:
+
+| `test_type` | What it sends | Sound |
+|---|---|---|
+| `orders`   | A sample new-order push | `cashregister` |
+| `buybox`   | A sample Buy Box win/loss push | `pushover` (default) |
+| `shipment` | A sample inbound-shipment status push | `pushover` (default) |
+| `generic`  | A plain "wired up correctly" push | `pushover` (default) |
+| `none`     | Does nothing — runs the real check instead | n/a |
+
+Every test push is prefixed `[TEST]` in the title so it's never mistaken
+for a real order, Buy Box change, or shipment update. Only the `orders`
+type uses the cash-register sound — Buy Box and shipment notifications
+intentionally use Pushover's plain default sound instead, so you can
+tell at a glance (or by ear) whether a push is a new order or one of the
+other two.
+
+If a test push doesn't arrive within a few seconds:
 
 - Check the workflow run's logs for the error.
 - Double check the two Pushover secrets — a wrong token/user key is the
@@ -118,11 +136,12 @@ you don't:
 
 ### 4. Bootstrap
 
-Run the workflow once more with `test_notification` left as `false` (or
-just wait for the next scheduled run). This is the "bootstrap" run — it
-records your currently open orders as already-seen without notifying.
-After that, it's fully automatic: every 5 minutes, forever, only *new*
-orders trigger a push.
+Run the workflow once more with `test_type` left as `none` (or just wait
+for the next scheduled run). This is the "bootstrap" run — it records
+your currently open orders (and, over time, current Buy Box/shipment
+status) as already-seen without notifying. After that, it's fully
+automatic: every 5 minutes, forever, only *new* orders, Buy Box changes,
+or shipment status changes trigger a push.
 
 ## Troubleshooting
 
@@ -147,9 +166,12 @@ orders trigger a push.
   for a long time can mean Walmart's report generation is slow or the
   request/status/download field names differ slightly from what's coded
   — the raw response is printed right there in the logs to help spot it.
-- **`test_notification=true` doesn't test Buy Box or shipment logic**: it
-  only confirms your Pushover credentials work by sending one generic
-  test push. The Buy Box and shipment checks only run during a normal
-  (non-test) run, so the first real signal that they're working is
+- **A `test_type` run only sends a sample push — it doesn't test the real
+  Walmart/Reports API calls**: `orders`, `buybox`, `shipment`, and
+  `generic` all skip the Walmart API entirely and just confirm the
+  message wording, sound, and your Pushover credentials. The real Buy
+  Box and shipment *checks* (the report request/poll/download, and the
+  inbound-shipments GET) only run during a normal (`test_type: none`)
+  run, so the first real signal that they're working end-to-end is
   either a live status change or the "Bootstrapped ... No notifications
-  sent" log lines on their first-ever run.
+  sent" log lines on their first-ever real run.
