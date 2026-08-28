@@ -8,10 +8,17 @@ on:
     - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
-      test_notification:
-        description: "Send a test Pushover push and exit (no Walmart API call)"
+      test_type:
+        description: "Send a sample push of this type and exit (no Walmart API call)"
         required: false
-        default: "false"
+        type: choice
+        default: "none"
+        options:
+          - none
+          - orders
+          - buybox
+          - shipment
+          - generic
 
 # Prevent two runs from racing to read/write state/seen_orders.json if a run
 # ever takes longer than 5 minutes.
@@ -35,7 +42,7 @@ jobs:
           WALMART_CLIENT_SECRET: ${{ secrets.WALMART_CLIENT_SECRET }}
           PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
           PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
-          TEST_NOTIFICATION: ${{ github.event.inputs.test_notification }}
+          TEST_TYPE: ${{ github.event.inputs.test_type }}
         run: python3 scripts/check_orders.py
 
       - name: Commit updated state
