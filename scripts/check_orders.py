@@ -28,7 +28,12 @@ Env vars required:
     PUSHOVER_USER_KEY
 
 Optional:
-    TEST_NOTIFICATION=true   -> send one test push and exit (no Walmart call)
+    TEST_TYPE=orders|buybox|shipment|generic
+        -> send one realistic sample push of that type and exit (no Walmart
+           call). Lets you check wording/sound for each notification kind
+           on demand instead of waiting for a real event. "generic" (or
+           the older TEST_NOTIFICATION=true) just checks Pushover
+           connectivity with a plain message.
 
 A note on accuracy: Walmart's public docs for the Buy Box insights report
 and the inbound-shipments status field don't spell out every exact field
@@ -147,6 +152,40 @@ def send_pushover(app_token, user_key, title, message, sound="cashregister", pri
     )
     if status != 200:
         raise RuntimeError(f"Pushover send failed ({status}): {body.decode('utf-8', 'replace')}")
+
+
+# ---------------------------------------------------------------------------
+# On-demand sample notifications (for testing sound/wording without waiting
+# for a real Walmart event)
+# ---------------------------------------------------------------------------
+
+SAMPLE_NOTIFICATIONS = {
+    "orders": (
+        "New Walmart order!",
+        "Order TEST-PO-1001 — 2 item(s)\nSample Product Name",
+        "cashregister",
+    ),
+    "buybox": (
+        "Buy Box status changed",
+        "Sample Product Name\nSKU TEST-SKU-123 won the Buy Box. Available inventory: 42",
+        "pushover",
+    ),
+    "shipment": (
+        "Inbound shipment update",
+        "Shipment TEST-SHIP-456: In Transit -> Arrived\nTracking: 1Z999AA10123456784",
+        "pushover",
+    ),
+    "generic": (
+        "Test notification",
+        "Your Walmart order checker is wired up correctly.",
+        "pushover",
+    ),
+}
+
+
+def send_sample_notification(pushover_token, pushover_user, test_type):
+    title, message, sound = SAMPLE_NOTIFICATIONS.get(test_type, SAMPLE_NOTIFICATIONS["generic"])
+    send_pushover(pushover_token, pushover_user, f"[TEST] {title}", message, sound=sound)
 
 
 # ---------------------------------------------------------------------------
@@ -447,14 +486,13 @@ def main():
     pushover_token = os.environ["PUSHOVER_APP_TOKEN"]
     pushover_user = os.environ["PUSHOVER_USER_KEY"]
 
-    if os.environ.get("TEST_NOTIFICATION", "false").lower() == "true":
-        send_pushover(
-            pushover_token,
-            pushover_user,
-            "Test notification",
-            "Your Walmart order checker is wired up correctly.",
-        )
-        print("Sent test notification.")
+    test_type = os.environ.get("TEST_TYPE", "").strip().lower()
+    if not test_type and os.environ.get("TEST_NOTIFICATION", "false").lower() == "true":
+        test_type = "generic"  # back-compat with the old boolean-only test flag
+
+    if test_type and test_type != "none":
+        send_sample_notification(pushover_token, pushover_user, test_type)
+        print(f"Sent sample '{test_type}' notification.")
         return
 
     state = load_state()
