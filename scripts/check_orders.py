@@ -1,14 +1,25 @@
 #!/usr/bin/env python3
 """
-Polls the Walmart Marketplace Orders API for orders that are newly created
-(status=Created, i.e. released to the seller but not yet acknowledged) and
-sends a Pushover push notification (with a cash-register sound) for any
-order this script hasn't already notified about.
+Polls Walmart Marketplace / WFS for three kinds of events and sends a
+Pushover push notification for each one it hasn't already notified about:
 
-State (which order IDs have already triggered a notification) is persisted
-to state/seen_orders.json, which the GitHub Actions workflow commits back
-to the repo after every run. That's what lets a stateless 5-minute cron job
-avoid re-notifying about the same order forever.
+1. New orders (status=Created) -> cash-register sound, same as before.
+2. Buy Box wins/losses on your published items, filtered to items that
+   currently have available inventory. Walmart's Buy Box change event is
+   webhook-only (there's no plain polling API for it), so this uses the
+   On-Request Reports API instead: request a BUYBOX report, poll until
+   it's ready, download it, and diff it against the last known
+   winner/loser state per SKU. Report generation isn't instant, so this
+   check only runs once every BUYBOX_CHECK_INTERVAL_SECONDS (default 30
+   minutes) rather than on every 5-minute cron tick.
+3. Inbound (WFS) shipment status changes (e.g. In Transit, Arrived,
+   Receiving, Completed) via the Fulfillment API's inbound-shipments
+   endpoint. That IS a plain pollable GET, so it runs every 5 minutes
+   like the order check.
+
+All state lives in state/seen_orders.json (kept as one file for
+simplicity, despite the name predating the newer checks), which the
+GitHub Actions workflow commits back to the repo after every run.
 
 Env vars required:
     WALMART_CLIENT_ID
@@ -18,8 +29,17 @@ Env vars required:
 
 Optional:
     TEST_NOTIFICATION=true   -> send one test push and exit (no Walmart call)
+
+A note on accuracy: Walmart's public docs for the Buy Box insights report
+and the inbound-shipments status field don't spell out every exact field
+name / status string. This script parses defensively (case-insensitive,
+tries a few known field-name variants) and prints the raw values it sees
+to the Action's logs, so if Walmart's real response differs slightly from
+the docs, it's easy to spot in the logs and adjust.
 """
 import base64
+import csv
+import io
 import json
 import os
 import pathlib
@@ -35,20 +55,38 @@ PUSHOVER_URL = "https://api.pushover.net/1/messages.json"
 STATE_PATH = pathlib.Path(__file__).resolve().parent.parent / "state" / "seen_orders.json"
 MAX_SEEN_IDS = 2000  # cap state file size; see README for the (very unlikely) tail risk
 
+# Buy Box report generation isn't instant, so only request a fresh one this
+# often. Inbound shipments and orders still get checked every 5 minutes.
+BUYBOX_CHECK_INTERVAL_SECONDS = 30 * 60
+
+READY_STATUSES = {"READY", "COMPLETED", "DONE", "SUCCESS", "SUCCEEDED"}
+FAILED_STATUSES = {"ERROR", "FAILED", "FAILURE", "CANCELLED", "CANCELED"}
+
 
 def http_request(url, method="GET", headers=None, data=None, params=None, timeout=30):
-    """Minimal stdlib HTTP helper (no third-party deps -> faster/cheaper Actions runs)."""
+    """Minimal stdlib HTTP helper (no third-party deps -> faster/cheaper Actions runs).
+
+    Returns (status, raw_bytes, response_headers_dict).
+    """
     if params:
         url = f"{url}?{urllib.parse.urlencode(params)}"
     body = None
+    headers = dict(headers or {})
     if data is not None:
-        body = urllib.parse.urlencode(data).encode("utf-8") if isinstance(data, dict) else data
-    req = urllib.request.Request(url, data=body, headers=headers or {}, method=method)
+        if isinstance(data, (bytes, bytearray)):
+            body = data
+        elif isinstance(data, dict) and headers.get("Content-Type", "").startswith("application/json"):
+            body = json.dumps(data).encode("utf-8")
+        elif isinstance(data, dict):
+            body = urllib.parse.urlencode(data).encode("utf-8")
+        else:
+            body = data
+    req = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.status, resp.read().decode("utf-8")
+            return resp.status, resp.read(), dict(resp.getheaders())
     except urllib.error.HTTPError as e:
-        return e.code, e.read().decode("utf-8", errors="replace")
+        return e.code, e.read(), dict(e.headers or {})
 
 
 def load_state():
@@ -68,7 +106,7 @@ def save_state(state):
 
 def get_access_token(client_id, client_secret):
     basic = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
-    status, body = http_request(
+    status, body, _ = http_request(
         f"{WALMART_BASE}/token",
         method="POST",
         headers={
@@ -81,32 +119,21 @@ def get_access_token(client_id, client_secret):
         data={"grant_type": "client_credentials"},
     )
     if status != 200:
-        raise RuntimeError(f"Token request failed ({status}): {body}")
+        raise RuntimeError(f"Token request failed ({status}): {body.decode('utf-8', 'replace')}")
     return json.loads(body)["access_token"]
 
 
-def get_created_orders(access_token, limit=200):
-    status, body = http_request(
-        f"{WALMART_BASE}/orders",
-        headers={
-            "Accept": "application/json",
-            "WM_SEC.ACCESS_TOKEN": access_token,
-            "WM_SVC.NAME": "Walmart Marketplace",
-            "WM_QOS.CORRELATION_ID": str(uuid.uuid4()),
-        },
-        params={"status": "Created", "limit": limit},
-    )
-    if status != 200:
-        raise RuntimeError(f"Orders request failed ({status}): {body}")
-    data = json.loads(body)
-    order_list = data.get("list", {}).get("elements", {}).get("order", [])
-    if isinstance(order_list, dict):  # Walmart returns a bare object when there's exactly 1 order
-        order_list = [order_list]
-    return order_list
+def auth_headers(access_token, accept="application/json"):
+    return {
+        "Accept": accept,
+        "WM_SEC.ACCESS_TOKEN": access_token,
+        "WM_SVC.NAME": "Walmart Marketplace",
+        "WM_QOS.CORRELATION_ID": str(uuid.uuid4()),
+    }
 
 
-def send_pushover(app_token, user_key, title, message, sound="cashregister"):
-    status, body = http_request(
+def send_pushover(app_token, user_key, title, message, sound="cashregister", priority=1):
+    status, body, _ = http_request(
         PUSHOVER_URL,
         method="POST",
         data={
@@ -115,11 +142,30 @@ def send_pushover(app_token, user_key, title, message, sound="cashregister"):
             "title": title,
             "message": message,
             "sound": sound,
-            "priority": 1,
+            "priority": priority,
         },
     )
     if status != 200:
-        raise RuntimeError(f"Pushover send failed ({status}): {body}")
+        raise RuntimeError(f"Pushover send failed ({status}): {body.decode('utf-8', 'replace')}")
+
+
+# ---------------------------------------------------------------------------
+# New orders
+# ---------------------------------------------------------------------------
+
+def get_created_orders(access_token, limit=200):
+    status, body, _ = http_request(
+        f"{WALMART_BASE}/orders",
+        headers=auth_headers(access_token),
+        params={"status": "Created", "limit": limit},
+    )
+    if status != 200:
+        raise RuntimeError(f"Orders request failed ({status}): {body.decode('utf-8', 'replace')}")
+    data = json.loads(body)
+    order_list = data.get("list", {}).get("elements", {}).get("order", [])
+    if isinstance(order_list, dict):  # Walmart returns a bare object when there's exactly 1 order
+        order_list = [order_list]
+    return order_list
 
 
 def order_summary(order):
@@ -132,6 +178,267 @@ def order_summary(order):
     if lines:
         first_item_name = lines[0].get("item", {}).get("productName", "")
     return po_id, item_count, first_item_name
+
+
+def check_new_orders(state, access_token, pushover_token, pushover_user):
+    seen_ids = set(state.get("seen_order_ids", []))
+    orders = get_created_orders(access_token)
+    print(f"[orders] Fetched {len(orders)} order(s) with status=Created.")
+
+    current_ids = set()
+    new_orders = []
+    for order in orders:
+        po_id = order.get("purchaseOrderId")
+        if not po_id:
+            continue
+        current_ids.add(po_id)
+        if po_id not in seen_ids:
+            new_orders.append(order)
+
+    if not state.get("bootstrapped"):
+        print(f"[orders] Bootstrapping with {len(current_ids)} existing order id(s). No notifications sent.")
+        state["seen_order_ids"] = list(current_ids)
+        state["bootstrapped"] = True
+        return
+
+    for order in new_orders:
+        po_id, item_count, first_item_name = order_summary(order)
+        message = f"Order {po_id} — {item_count} item(s)"
+        if first_item_name:
+            message += f"\n{first_item_name}"
+        send_pushover(pushover_token, pushover_user, "New Walmart order!", message, sound="cashregister")
+        print(f"[orders] Notified for new order {po_id}.")
+
+    if not new_orders:
+        print("[orders] No new orders since last check.")
+
+    seen_ids.update(current_ids)
+    state["seen_order_ids"] = list(seen_ids)[-MAX_SEEN_IDS:]
+
+
+# ---------------------------------------------------------------------------
+# Inbound (WFS) shipment status changes
+# ---------------------------------------------------------------------------
+
+def get_inbound_shipments(access_token, limit=200):
+    status, body, _ = http_request(
+        f"{WALMART_BASE}/fulfillment/inbound-shipments",
+        headers=auth_headers(access_token),
+        params={"limit": limit},
+    )
+    if status != 200:
+        raise RuntimeError(f"Inbound shipments request failed ({status}): {body.decode('utf-8', 'replace')}")
+    data = json.loads(body)
+    # Defensive: the exact envelope shape isn't fully documented; try the
+    # most likely spots for a list of shipment records.
+    shipments = (
+        data.get("shipments")
+        or data.get("elements")
+        or data.get("payload")
+        or (data if isinstance(data, list) else None)
+        or []
+    )
+    if isinstance(shipments, dict):
+        shipments = [shipments]
+    return shipments
+
+
+def check_inbound_shipments(state, access_token, pushover_token, pushover_user):
+    prev_statuses = state.get("shipment_statuses", {})
+    shipments = get_inbound_shipments(access_token)
+    print(f"[shipments] Fetched {len(shipments)} inbound shipment(s).")
+
+    new_statuses = dict(prev_statuses)
+    first_run = not state.get("shipments_bootstrapped")
+
+    for shipment in shipments:
+        shipment_id = str(
+            shipment.get("shipmentId") or shipment.get("inboundOrderId") or shipment.get("id") or ""
+        )
+        if not shipment_id:
+            continue
+        current_status = str(shipment.get("status") or shipment.get("shipmentStatus") or "UNKNOWN")
+
+        prev_status = prev_statuses.get(shipment_id)
+        new_statuses[shipment_id] = current_status
+
+        if first_run:
+            continue  # bootstrap: record but don't notify
+
+        if prev_status is not None and prev_status != current_status:
+            tracking = shipment.get("trackingNo") or shipment.get("trackingNumber") or "n/a"
+            message = f"Shipment {shipment_id}: {prev_status} -> {current_status}\nTracking: {tracking}"
+            send_pushover(pushover_token, pushover_user, "Inbound shipment update", message, sound="pushover")
+            print(f"[shipments] Notified: {shipment_id} {prev_status} -> {current_status}")
+        elif prev_status is None:
+            # A shipment that showed up after bootstrap - new info worth a push.
+            message = f"New inbound shipment {shipment_id}: status {current_status}"
+            send_pushover(pushover_token, pushover_user, "Inbound shipment update", message, sound="pushover")
+            print(f"[shipments] Notified: new shipment {shipment_id} ({current_status})")
+
+    if first_run:
+        print(f"[shipments] Bootstrapped with {len(new_statuses)} shipment(s). No notifications sent.")
+        state["shipments_bootstrapped"] = True
+
+    state["shipment_statuses"] = new_statuses
+
+
+# ---------------------------------------------------------------------------
+# Buy Box winner/loser changes (published items with available inventory)
+# ---------------------------------------------------------------------------
+
+def request_buybox_report(access_token):
+    status, body, _ = http_request(
+        f"{WALMART_BASE}/reports/reportRequests",
+        method="POST",
+        headers={**auth_headers(access_token), "Content-Type": "application/json"},
+        params={"reportType": "BUYBOX", "reportVersion": "v1"},
+        data={},
+    )
+    if status not in (200, 201):
+        raise RuntimeError(f"Buy Box report request failed ({status}): {body.decode('utf-8', 'replace')}")
+    data = json.loads(body)
+    request_id = data.get("requestId") or data.get("id")
+    if not request_id:
+        raise RuntimeError(f"Buy Box report request had no requestId in response: {body[:500]!r}")
+    return request_id
+
+
+def get_report_status(access_token, request_id):
+    status, body, _ = http_request(
+        f"{WALMART_BASE}/reports/reportRequests/{request_id}",
+        headers=auth_headers(access_token),
+    )
+    if status != 200:
+        raise RuntimeError(f"Buy Box report status check failed ({status}): {body.decode('utf-8', 'replace')}")
+    data = json.loads(body)
+    report_status = str(data.get("requestStatus") or data.get("status") or "").upper()
+    download_url = data.get("downloadUrl") or data.get("downloadURL")
+    return report_status, download_url, data
+
+
+def download_buybox_report(access_token, request_id, download_url=None):
+    if download_url:
+        status, body, headers = http_request(download_url)
+    else:
+        status, body, headers = http_request(
+            f"{WALMART_BASE}/reports/downloadReport",
+            headers=auth_headers(access_token, accept="text/csv"),
+            params={"requestId": request_id},
+        )
+    if status != 200:
+        raise RuntimeError(f"Buy Box report download failed ({status}): {body[:500]!r}")
+
+    content_encoding = (headers.get("Content-Encoding") or "").lower()
+    if content_encoding == "gzip" or body[:2] == b"\x1f\x8b":
+        import gzip
+        body = gzip.decompress(body)
+
+    text = body.decode("utf-8", errors="replace")
+    rows = list(csv.DictReader(io.StringIO(text)))
+    print(f"[buybox] Downloaded report with {len(rows)} row(s).")
+    return rows
+
+
+def _normalize_key(k):
+    return (k or "").strip().lower().replace(" ", "").replace("_", "")
+
+
+def _row_get(row, *candidates):
+    normalized = {_normalize_key(k): v for k, v in row.items()}
+    for candidate in candidates:
+        v = normalized.get(_normalize_key(candidate))
+        if v is not None:
+            return v
+    return None
+
+
+def get_available_inventory(access_token, sku):
+    status, body, _ = http_request(
+        f"{WALMART_BASE}/inventory",
+        headers=auth_headers(access_token),
+        params={"sku": sku},
+    )
+    if status != 200:
+        print(f"[buybox] Inventory lookup for SKU {sku} failed ({status}); treating as 0 available.")
+        return 0
+    data = json.loads(body)
+    quantity = data.get("quantity") or {}
+    amount = quantity.get("amount")
+    if amount is None:
+        amount = data.get("availToSellQty") or 0
+    try:
+        return int(amount)
+    except (TypeError, ValueError):
+        return 0
+
+
+def process_buybox(state, access_token, pushover_token, pushover_user):
+    now = int(time.time())
+    request_id = state.get("buybox_report_request_id")
+
+    if request_id:
+        report_status, download_url, raw = get_report_status(access_token, request_id)
+        print(f"[buybox] Pending report {request_id} status: {report_status!r} (raw: {json.dumps(raw)[:300]})")
+
+        if report_status in READY_STATUSES:
+            rows = download_buybox_report(access_token, request_id, download_url)
+            prev_winners = state.get("buybox_winner_status", {})
+            new_winners = dict(prev_winners)
+            first_run = not state.get("buybox_bootstrapped")
+
+            for row in rows:
+                sku = _row_get(row, "sku")
+                if not sku:
+                    continue
+                winner_raw = str(_row_get(row, "isSellerBuyBoxWinner", "buyBoxWinner") or "").strip().lower()
+                is_winner = winner_raw in ("yes", "true", "1")
+                item_name = _row_get(row, "productName", "itemName") or sku
+
+                prev = prev_winners.get(sku)
+                new_winners[sku] = is_winner
+
+                if first_run or prev is None or prev == is_winner:
+                    continue  # nothing changed (or nothing to compare against yet)
+
+                qty = get_available_inventory(access_token, sku)
+                if qty <= 0:
+                    print(f"[buybox] {sku} changed Buy Box status but has no available inventory ({qty}); skipping.")
+                    continue
+
+                verb = "won" if is_winner else "lost"
+                message = f"{item_name}\nSKU {sku} {verb} the Buy Box. Available inventory: {qty}"
+                send_pushover(pushover_token, pushover_user, "Buy Box status changed", message, sound="pushover")
+                print(f"[buybox] Notified: {sku} {verb} the Buy Box (qty={qty}).")
+
+            if first_run:
+                print(f"[buybox] Bootstrapped Buy Box status for {len(new_winners)} SKU(s). No notifications sent.")
+                state["buybox_bootstrapped"] = True
+
+            state["buybox_winner_status"] = new_winners
+            state["buybox_report_request_id"] = None
+            state["buybox_report_requested_at"] = None
+            state["last_buybox_check"] = now
+
+        elif report_status in FAILED_STATUSES:
+            print(f"[buybox] Report {request_id} failed with status {report_status!r}; will retry next interval.")
+            state["buybox_report_request_id"] = None
+            state["buybox_report_requested_at"] = None
+        else:
+            print(f"[buybox] Report {request_id} still processing; checking again next run.")
+        return
+
+    last_check = state.get("last_buybox_check") or 0
+    if now - last_check < BUYBOX_CHECK_INTERVAL_SECONDS:
+        return  # not time yet
+
+    try:
+        new_request_id = request_buybox_report(access_token)
+        state["buybox_report_request_id"] = new_request_id
+        state["buybox_report_requested_at"] = now
+        print(f"[buybox] Requested new Buy Box report: {new_request_id}")
+    except Exception as e:
+        print(f"[buybox] Failed to request Buy Box report: {e}", file=sys.stderr)
 
 
 def main():
@@ -151,45 +458,23 @@ def main():
         return
 
     state = load_state()
-    seen_ids = set(state.get("seen_order_ids", []))
-
     token = get_access_token(client_id, client_secret)
-    orders = get_created_orders(token)
-    print(f"Fetched {len(orders)} order(s) with status=Created.")
 
-    current_ids = set()
-    new_orders = []
-    for order in orders:
-        po_id = order.get("purchaseOrderId")
-        if not po_id:
-            continue
-        current_ids.add(po_id)
-        if po_id not in seen_ids:
-            new_orders.append(order)
+    try:
+        check_new_orders(state, token, pushover_token, pushover_user)
+    except Exception as e:
+        print(f"[orders] ERROR: {e}", file=sys.stderr)
 
-    if not state.get("bootstrapped"):
-        # First-ever run: seed state with whatever's already sitting there so we
-        # don't fire a notification storm for pre-existing orders.
-        print(f"Bootstrapping state with {len(current_ids)} existing order id(s). No notifications sent this run.")
-        state["seen_order_ids"] = list(current_ids)
-        state["bootstrapped"] = True
-        save_state(state)
-        return
+    try:
+        check_inbound_shipments(state, token, pushover_token, pushover_user)
+    except Exception as e:
+        print(f"[shipments] ERROR: {e}", file=sys.stderr)
 
-    for order in new_orders:
-        po_id, item_count, first_item_name = order_summary(order)
-        message = f"Order {po_id} — {item_count} item(s)"
-        if first_item_name:
-            message += f"\n{first_item_name}"
-        send_pushover(pushover_token, pushover_user, "New Walmart order!", message)
-        print(f"Notified for new order {po_id}.")
+    try:
+        process_buybox(state, token, pushover_token, pushover_user)
+    except Exception as e:
+        print(f"[buybox] ERROR: {e}", file=sys.stderr)
 
-    if not new_orders:
-        print("No new orders since last check.")
-
-    seen_ids.update(current_ids)
-    # Cap growth; extremely unlikely to ever matter for a single seller's Created backlog.
-    state["seen_order_ids"] = list(seen_ids)[-MAX_SEEN_IDS:]
     save_state(state)
 
 
