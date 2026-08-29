@@ -336,21 +336,22 @@ def check_inbound_shipments(state, access_token, pushover_token, pushover_user):
 # full sample response, so this prints the raw payload every run until the
 # real field names/values are confirmed live.
 
-def get_shipment_tracking(access_token, mode_type="Parcel"):
-    # Walmart's sample request for this endpoint includes two extra headers
-    # beyond the shared auth_headers() set - missing them returns a plain 404.
+def get_shipment_tracking(access_token, shipment_id, mode_type="Parcel"):
+    # Walmart's docs only show `modeType` in the sample request, but the
+    # live API 400s without a `shipmentId` too - this endpoint is per-shipment,
+    # not a bulk list like the coarse inbound-shipments endpoint above.
     headers = auth_headers(access_token)
     headers["WM_GLOBAL_VERSION"] = "3.1"
     headers["WM_MARKET"] = "US"
     status, body, _ = http_request(
         f"{WALMART_BASE}/fulfillment/inbound-shipments-tracking",
         headers=headers,
-        params={"modeType": mode_type},
+        params={"modeType": mode_type, "shipmentId": shipment_id},
     )
     if status != 200:
         raise RuntimeError(f"Shipment tracking request failed ({status}): {body.decode('utf-8', 'replace')}")
     data = json.loads(body)
-    print(f"[tracking] Raw response: {json.dumps(data)[:2000]}")
+    print(f"[tracking] Raw response for {shipment_id}: {json.dumps(data)[:2000]}")
     # Defensive: exact envelope isn't fully documented, try the most likely spots.
     payload = data.get("payload") if isinstance(data.get("payload"), dict) else None
     records = (
@@ -364,44 +365,48 @@ def get_shipment_tracking(access_token, mode_type="Parcel"):
         records = [records]
     return records
 
-def check_shipment_tracking(state, access_token, pushover_token, pushover_user, mode_type="Parcel"):
+def check_shipment_tracking(state, access_token, pushover_token, pushover_user, shipment_ids, mode_type="Parcel"):
     prev_tracking = state.get("shipment_tracking_statuses", {})
-    records = get_shipment_tracking(access_token, mode_type=mode_type)
-    print(f"[tracking] Fetched {len(records)} tracking record(s).")
-
     new_tracking = dict(prev_tracking)
     first_run = not state.get("shipment_tracking_bootstrapped")
+    total_records = 0
 
-    for record in records:
-        shipment_id = str(
-            record.get("shipmentId") or record.get("inboundOrderId") or record.get("id") or ""
-        )
-        if not shipment_id:
+    for shipment_id in shipment_ids:
+        try:
+            records = get_shipment_tracking(access_token, shipment_id, mode_type=mode_type)
+        except Exception as e:
+            print(f"[tracking] ERROR fetching {shipment_id}: {e}", file=sys.stderr)
             continue
-        current_status = str(
-            record.get("status") or record.get("trackingStatus") or record.get("shipmentStatus") or "UNKNOWN"
-        )
+        total_records += len(records)
 
-        prev_status = prev_tracking.get(shipment_id)
-        new_tracking[shipment_id] = current_status
+        for record in records:
+            record_shipment_id = str(record.get("shipmentId") or shipment_id)
+            current_status = str(
+                record.get("status") or record.get("trackingStatus") or record.get("shipmentStatus") or "UNKNOWN"
+            )
 
-        if first_run:
-            continue  # bootstrap: record but don't notify
+            prev_status = prev_tracking.get(record_shipment_id)
+            new_tracking[record_shipment_id] = current_status
 
-        if prev_status is not None and prev_status != current_status:
-            tracking_no = record.get("trackingNo") or record.get("trackingNumber") or "n/a"
-            carrier = record.get("carrierName") or record.get("carrier") or ""
-            message = f"Shipment {shipment_id}: {prev_status} -> {current_status}"
-            if tracking_no != "n/a":
-                message += f"\nTracking: {tracking_no}"
-            if carrier:
-                message += f" ({carrier})"
-            send_pushover(pushover_token, pushover_user, "Inbound shipment update", message, sound="pushover")
-            print(f"[tracking] Notified: {shipment_id} {prev_status} -> {current_status}")
-        elif prev_status is None:
-            message = f"New tracked shipment {shipment_id}: status {current_status}"
-            send_pushover(pushover_token, pushover_user, "Inbound shipment update", message, sound="pushover")
-            print(f"[tracking] Notified: new shipment {shipment_id} ({current_status})")
+            if first_run:
+                continue  # bootstrap: record but don't notify
+
+            if prev_status is not None and prev_status != current_status:
+                tracking_no = record.get("trackingNo") or record.get("trackingNumber") or "n/a"
+                carrier = record.get("carrierName") or record.get("carrier") or ""
+                message = f"Shipment {record_shipment_id}: {prev_status} -> {current_status}"
+                if tracking_no != "n/a":
+                    message += f"\nTracking: {tracking_no}"
+                if carrier:
+                    message += f" ({carrier})"
+                send_pushover(pushover_token, pushover_user, "Inbound shipment update", message, sound="pushover")
+                print(f"[tracking] Notified: {record_shipment_id} {prev_status} -> {current_status}")
+            elif prev_status is None:
+                message = f"New tracked shipment {record_shipment_id}: status {current_status}"
+                send_pushover(pushover_token, pushover_user, "Inbound shipment update", message, sound="pushover")
+                print(f"[tracking] Notified: new shipment {record_shipment_id} ({current_status})")
+
+    print(f"[tracking] Fetched tracking for {len(shipment_ids)} shipment id(s), {total_records} record(s) total.")
 
     if first_run:
         print(f"[tracking] Bootstrapped with {len(new_tracking)} tracked shipment(s). No notifications sent.")
@@ -596,7 +601,7 @@ def main():
         print(f"[shipments] ERROR: {e}", file=sys.stderr)
 
     try:
-        check_shipment_tracking(state, token, pushover_token, pushover_user)
+        check_shipment_tracking(state, token, pushover_token, pushover_user, list(state.get("shipment_statuses", {}).keys()))
     except Exception as e:
         print(f"[tracking] ERROR: {e}", file=sys.stderr)
 
