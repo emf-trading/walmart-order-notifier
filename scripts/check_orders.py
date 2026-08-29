@@ -323,6 +323,88 @@ def check_inbound_shipments(state, access_token, pushover_token, pushover_user):
 
 
 # ---------------------------------------------------------------------------
+# Granular inbound shipment tracking (In Transit, Arrived, Receiving, etc.)
+# ---------------------------------------------------------------------------
+#
+# The plain inbound-shipments endpoint above only exposes a coarse `status`
+# field (PENDING_SHIPMENT_DETAILS / AWAITING_DELIVERY / RECEIVING_IN_PROGRESS
+# / CLOSED / CANCELLED) that does not update until warehouse receiving
+# actually begins, so a shipment the Seller Center UI shows as "Arrived" can
+# sit at AWAITING_DELIVERY here indefinitely. The dedicated tracking endpoint
+# below is documented to return more granular carrier-level status (In
+# Transit, Arrived, Out for Delivery, etc.), but Walmart's docs don't show a
+# full sample response, so this prints the raw payload every run until the
+# real field names/values are confirmed live.
+
+def get_shipment_tracking(access_token, mode_type="Parcel"):
+    status, body, _ = http_request(
+        f"{WALMART_BASE}/fulfillment/inbound-shipments-tracking",
+        headers=auth_headers(access_token),
+        params={"modeType": mode_type},
+    )
+    if status != 200:
+        raise RuntimeError(f"Shipment tracking request failed ({status}): {body.decode('utf-8', 'replace')}")
+    data = json.loads(body)
+    print(f"[tracking] Raw response: {json.dumps(data)[:2000]}")
+    # Defensive: exact envelope isn't fully documented, try the most likely spots.
+    payload = data.get("payload") if isinstance(data.get("payload"), dict) else None
+    records = (
+        (payload.get("trackingList") if payload else None)
+        or data.get("trackingList")
+        or data.get("elements")
+        or (data if isinstance(data, list) else None)
+        or []
+    )
+    if isinstance(records, dict):
+        records = [records]
+    return records
+
+def check_shipment_tracking(state, access_token, pushover_token, pushover_user, mode_type="Parcel"):
+    prev_tracking = state.get("shipment_tracking_statuses", {})
+    records = get_shipment_tracking(access_token, mode_type=mode_type)
+    print(f"[tracking] Fetched {len(records)} tracking record(s).")
+
+    new_tracking = dict(prev_tracking)
+    first_run = not state.get("shipment_tracking_bootstrapped")
+
+    for record in records:
+        shipment_id = str(
+            record.get("shipmentId") or record.get("inboundOrderId") or record.get("id") or ""
+        )
+        if not shipment_id:
+            continue
+        current_status = str(
+            record.get("status") or record.get("trackingStatus") or record.get("shipmentStatus") or "UNKNOWN"
+        )
+
+        prev_status = prev_tracking.get(shipment_id)
+        new_tracking[shipment_id] = current_status
+
+        if first_run:
+            continue  # bootstrap: record but don't notify
+
+        if prev_status is not None and prev_status != current_status:
+            tracking_no = record.get("trackingNo") or record.get("trackingNumber") or "n/a"
+            carrier = record.get("carrierName") or record.get("carrier") or ""
+            message = f"Shipment {shipment_id}: {prev_status} -> {current_status}"
+            if tracking_no != "n/a":
+                message += f"\nTracking: {tracking_no}"
+            if carrier:
+                message += f" ({carrier})"
+            send_pushover(pushover_token, pushover_user, "Inbound shipment update", message, sound="pushover")
+            print(f"[tracking] Notified: {shipment_id} {prev_status} -> {current_status}")
+        elif prev_status is None:
+            message = f"New tracked shipment {shipment_id}: status {current_status}"
+            send_pushover(pushover_token, pushover_user, "Inbound shipment update", message, sound="pushover")
+            print(f"[tracking] Notified: new shipment {shipment_id} ({current_status})")
+
+    if first_run:
+        print(f"[tracking] Bootstrapped with {len(new_tracking)} tracked shipment(s). No notifications sent.")
+        state["shipment_tracking_bootstrapped"] = True
+
+    state["shipment_tracking_statuses"] = new_tracking
+
+# ---------------------------------------------------------------------------
 # Buy Box winner/loser changes (published items with available inventory)
 # ---------------------------------------------------------------------------
 
@@ -507,6 +589,11 @@ def main():
         check_inbound_shipments(state, token, pushover_token, pushover_user)
     except Exception as e:
         print(f"[shipments] ERROR: {e}", file=sys.stderr)
+
+    try:
+        check_shipment_tracking(state, token, pushover_token, pushover_user)
+    except Exception as e:
+        print(f"[tracking] ERROR: {e}", file=sys.stderr)
 
     try:
         process_buybox(state, token, pushover_token, pushover_user)
