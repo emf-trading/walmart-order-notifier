@@ -453,7 +453,7 @@ def download_buybox_report(access_token, request_id, download_url=None):
     else:
         status, body, headers = http_request(
             f"{WALMART_BASE}/reports/downloadReport",
-            headers=auth_headers(access_token, accept="text/csv"),
+            headers=auth_headers(access_token, accept="application/octet-stream"),
             params={"requestId": request_id},
         )
     if status != 200:
@@ -522,6 +522,7 @@ def process_buybox(state, access_token, pushover_token, pushover_user):
                 print(f"[buybox] Report {request_id} reached READY but download failed: {e}; will request a fresh report.", file=sys.stderr)
                 state["buybox_report_request_id"] = None
                 state["buybox_report_requested_at"] = None
+                state["last_buybox_check"] = now
                 return
 
             prev_winners = state.get("buybox_winner_status", {})
@@ -565,6 +566,7 @@ def process_buybox(state, access_token, pushover_token, pushover_user):
             print(f"[buybox] Report {request_id} failed with status {report_status!r}; will retry next interval.")
             state["buybox_report_request_id"] = None
             state["buybox_report_requested_at"] = None
+            state["last_buybox_check"] = now
         else:
             print(f"[buybox] Report {request_id} still processing; checking again next run.")
         return
@@ -580,6 +582,7 @@ def process_buybox(state, access_token, pushover_token, pushover_user):
         print(f"[buybox] Requested new Buy Box report: {new_request_id}")
     except Exception as e:
         print(f"[buybox] Failed to request Buy Box report: {e}", file=sys.stderr)
+        state["last_buybox_check"] = now
 
 
 def main():
