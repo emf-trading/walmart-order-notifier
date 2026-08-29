@@ -336,17 +336,16 @@ def check_inbound_shipments(state, access_token, pushover_token, pushover_user):
 # full sample response, so this prints the raw payload every run until the
 # real field names/values are confirmed live.
 
-def get_shipment_tracking(access_token, shipment_id, mode_type="Parcel"):
-    # Walmart's docs only show `modeType` in the sample request, but the
-    # live API 400s without a `shipmentId` too - this endpoint is per-shipment,
-    # not a bulk list like the coarse inbound-shipments endpoint above.
+def get_shipment_tracking(access_token, shipment_id, mode_type="Parcel", limit=50):
+    # Walmart's docs only show `modeType` in the sample request, but the live
+    # API also 400s without `shipmentId` and `limit` (both undocumented here).
     headers = auth_headers(access_token)
     headers["WM_GLOBAL_VERSION"] = "3.1"
     headers["WM_MARKET"] = "US"
     status, body, _ = http_request(
         f"{WALMART_BASE}/fulfillment/inbound-shipments-tracking",
         headers=headers,
-        params={"modeType": mode_type, "shipmentId": shipment_id},
+        params={"modeType": mode_type, "shipmentId": shipment_id, "limit": limit},
     )
     if status != 200:
         raise RuntimeError(f"Shipment tracking request failed ({status}): {body.decode('utf-8', 'replace')}")
