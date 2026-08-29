@@ -512,7 +512,18 @@ def process_buybox(state, access_token, pushover_token, pushover_user):
         print(f"[buybox] Pending report {request_id} status: {report_status!r} (raw: {json.dumps(raw)[:300]})")
 
         if report_status in READY_STATUSES:
-            rows = download_buybox_report(access_token, request_id, download_url)
+            try:
+                rows = download_buybox_report(access_token, request_id, download_url)
+            except Exception as e:
+                # A report can reach READY but still fail to download (e.g. an
+                # expired download window) - without this reset, this would
+                # keep retrying the same stuck report forever instead of ever
+                # requesting a fresh one.
+                print(f"[buybox] Report {request_id} reached READY but download failed: {e}; will request a fresh report.", file=sys.stderr)
+                state["buybox_report_request_id"] = None
+                state["buybox_report_requested_at"] = None
+                return
+
             prev_winners = state.get("buybox_winner_status", {})
             new_winners = dict(prev_winners)
             first_run = not state.get("buybox_bootstrapped")
