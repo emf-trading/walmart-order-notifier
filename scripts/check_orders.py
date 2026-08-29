@@ -64,6 +64,11 @@ MAX_SEEN_IDS = 2000  # cap state file size; see README for the (very unlikely) t
 # often. Inbound shipments and orders still get checked every 5 minutes.
 BUYBOX_CHECK_INTERVAL_SECONDS = 30 * 60
 
+# Walmart's docs say report generation is normally 15-45 minutes. If a
+# pending request sits stuck (e.g. RECEIVED) far past that, stop waiting on
+# it forever and let the code request a fresh one instead.
+BUYBOX_REPORT_STALE_SECONDS = 2 * 60 * 60
+
 READY_STATUSES = {"READY", "COMPLETED", "DONE", "SUCCESS", "SUCCEEDED"}
 FAILED_STATUSES = {"ERROR", "FAILED", "FAILURE", "CANCELLED", "CANCELED"}
 
@@ -568,7 +573,14 @@ def process_buybox(state, access_token, pushover_token, pushover_user):
             state["buybox_report_requested_at"] = None
             state["last_buybox_check"] = now
         else:
-            print(f"[buybox] Report {request_id} still processing; checking again next run.")
+            requested_at = state.get("buybox_report_requested_at") or 0
+            if requested_at and now - requested_at > BUYBOX_REPORT_STALE_SECONDS:
+                print(f"[buybox] Report {request_id} has been stuck in {report_status!r} for over {BUYBOX_REPORT_STALE_SECONDS // 60} minute(s); abandoning it and will request a fresh report.", file=sys.stderr)
+                state["buybox_report_request_id"] = None
+                state["buybox_report_requested_at"] = None
+                state["last_buybox_check"] = now
+            else:
+                print(f"[buybox] Report {request_id} still processing; checking again next run.")
         return
 
     last_check = state.get("last_buybox_check") or 0
