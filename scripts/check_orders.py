@@ -337,9 +337,14 @@ def check_inbound_shipments(state, access_token, pushover_token, pushover_user):
 # real field names/values are confirmed live.
 
 def get_shipment_tracking(access_token, mode_type="Parcel"):
+    # Walmart's sample request for this endpoint includes two extra headers
+    # beyond the shared auth_headers() set - missing them returns a plain 404.
+    headers = auth_headers(access_token)
+    headers["WM_GLOBAL_VERSION"] = "3.1"
+    headers["WM_MARKET"] = "US"
     status, body, _ = http_request(
         f"{WALMART_BASE}/fulfillment/inbound-shipments-tracking",
-        headers=auth_headers(access_token),
+        headers=headers,
         params={"modeType": mode_type},
     )
     if status != 200:
