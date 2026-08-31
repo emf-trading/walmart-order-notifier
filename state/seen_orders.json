@@ -1,7 +1,7 @@
 {
   "seen_order_ids": [],
   "bootstrapped": true,
-  "last_run": 1788203676,
+  "last_run": 1788204349,
   "shipments_bootstrapped": true,
   "shipment_statuses": {
     "1194477WFB": "AWAITING_DELIVERY",
@@ -18,7 +18,7 @@
   "buybox_report_requested_at": null,
   "shipment_tracking_bootstrapped": true,
   "shipment_tracking_statuses": {
-    "1194477WFB": "ON FEDEX VEHICLE FOR DELIVERY",
+    "1194477WFB": "DELIVERED",
     "1145367WFB": "DELIVERED",
     "1144418WFB": "DELIVERED",
     "1142817WFB": "DELIVERED",
