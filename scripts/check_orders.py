@@ -218,6 +218,13 @@ def get_created_orders(access_token, limit=200):
         raise RuntimeError(f"Orders request failed ({status}): {body.decode('utf-8', 'replace')}")
     data = json.loads(body)
     print(f"[orders] Raw response: {json.dumps(data)[:2000]}")
+    if data.get("list", {}).get("meta", {}).get("totalCount", 0) == 0:
+        diag_status, diag_body, _ = http_request(
+            f"{WALMART_BASE}/orders",
+            headers=auth_headers(access_token),
+            params={"limit": limit},
+        )
+        print(f"[orders] Diagnostic (no date filter, Walmart default window) status={diag_status}: {diag_body[:1000]}")
     order_list = data.get("list", {}).get("elements", {}).get("order", [])
     if isinstance(order_list, dict):  # Walmart returns a bare object when there's exactly 1 order
         order_list = [order_list]
