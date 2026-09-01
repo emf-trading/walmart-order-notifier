@@ -204,11 +204,15 @@ def send_sample_notification(pushover_token, pushover_user, test_type):
 # ---------------------------------------------------------------------------
 
 def get_created_orders(access_token, limit=200):
-    start_date = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=ORDER_LOOKBACK_HOURS)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = dt.datetime.now(dt.timezone.utc)
+    start_date = (now - dt.timedelta(hours=ORDER_LOOKBACK_HOURS)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    end_date = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    params = {"createdStartDate": start_date, "createdEndDate": end_date, "limit": limit}
+    print(f"[orders] Querying {WALMART_BASE}/orders with params: {params}")
     status, body, _ = http_request(
         f"{WALMART_BASE}/orders",
         headers=auth_headers(access_token),
-        params={"createdStartDate": start_date, "limit": limit},
+        params=params,
     )
     if status != 200:
         raise RuntimeError(f"Orders request failed ({status}): {body.decode('utf-8', 'replace')}")
