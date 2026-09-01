@@ -234,7 +234,7 @@ def order_summary(order):
 def check_new_orders(state, access_token, pushover_token, pushover_user):
     seen_ids = set(state.get("seen_order_ids", []))
     orders = get_created_orders(access_token)
-        print(f"[orders] Fetched {len(orders)} order(s) created in the last {ORDER_LOOKBACK_HOURS}h.")
+    print(f"[orders] Fetched {len(orders)} order(s) created in the last {ORDER_LOOKBACK_HOURS}h.")
     current_ids = set()
     new_orders = []
     for order in orders:
