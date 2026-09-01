@@ -213,12 +213,12 @@ def get_created_orders(access_token, limit=200):
     if status != 200:
         raise RuntimeError(f"Orders request failed ({status}): {body.decode('utf-8', 'replace')}")
     data = json.loads(body)
+    print(f"[orders] Raw response: {json.dumps(data)[:2000]}")
     order_list = data.get("list", {}).get("elements", {}).get("order", [])
     if isinstance(order_list, dict):  # Walmart returns a bare object when there's exactly 1 order
         order_list = [order_list]
     return order_list
-
-
+    
 def order_summary(order):
     po_id = order.get("purchaseOrderId", "unknown")
     lines = order.get("orderLines", {}).get("orderLine", [])
