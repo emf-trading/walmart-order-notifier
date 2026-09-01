@@ -3,7 +3,7 @@
 Polls Walmart Marketplace / WFS for three kinds of events and sends a
 Pushover push notification for each one it hasn't already notified about:
 
-1. New orders (status=Created) -> cash-register sound, same as before.
+1. New orders created in the last ORDER_LOOKBACK_HOURS hours (not just status=Created, so a fast status change can't cause a missed notification) -> cash-register sound, same as before.
 2. Buy Box wins/losses on your published items, filtered to items that
    currently have available inventory. Walmart's Buy Box change event is
    webhook-only (there's no plain polling API for it), so this uses the
@@ -44,6 +44,7 @@ the docs, it's easy to spot in the logs and adjust.
 """
 import base64
 import csv
+import datetime as dt
 import io
 import json
 import os
@@ -63,6 +64,11 @@ MAX_SEEN_IDS = 2000  # cap state file size; see README for the (very unlikely) t
 # Buy Box report generation isn't instant, so only request a fresh one this
 # often. Inbound shipments and orders still get checked every 5 minutes.
 BUYBOX_CHECK_INTERVAL_SECONDS = 30 * 60
+
+# How far back to look for orders each run. A rolling window (rather than
+# relying on status=Created alone) means a fast status change on Walmart's
+# side can't cause a missed notification.
+ORDER_LOOKBACK_HOURS = 24
 
 # Walmart's docs say report generation is normally 15-45 minutes. If a
 # pending request sits stuck (e.g. RECEIVED) far past that, stop waiting on
@@ -198,10 +204,11 @@ def send_sample_notification(pushover_token, pushover_user, test_type):
 # ---------------------------------------------------------------------------
 
 def get_created_orders(access_token, limit=200):
+    start_date = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=ORDER_LOOKBACK_HOURS)).strftime("%Y-%m-%dT%H:%M:%SZ")
     status, body, _ = http_request(
         f"{WALMART_BASE}/orders",
         headers=auth_headers(access_token),
-        params={"status": "Created", "limit": limit},
+        params={"createdStartDate": start_date, "limit": limit},
     )
     if status != 200:
         raise RuntimeError(f"Orders request failed ({status}): {body.decode('utf-8', 'replace')}")
@@ -227,8 +234,7 @@ def order_summary(order):
 def check_new_orders(state, access_token, pushover_token, pushover_user):
     seen_ids = set(state.get("seen_order_ids", []))
     orders = get_created_orders(access_token)
-    print(f"[orders] Fetched {len(orders)} order(s) with status=Created.")
-
+        print(f"[orders] Fetched {len(orders)} order(s) created in the last {ORDER_LOOKBACK_HOURS}h.")
     current_ids = set()
     new_orders = []
     for order in orders:
