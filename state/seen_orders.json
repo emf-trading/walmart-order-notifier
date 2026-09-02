@@ -1,7 +1,7 @@
 {
   "seen_order_ids": [],
   "bootstrapped": true,
-  "last_run": 1788330440,
+  "last_run": 1788331663,
   "shipments_bootstrapped": true,
   "shipment_statuses": {
     "1194477WFB": "AWAITING_DELIVERY",
@@ -25,7 +25,7 @@
     "1009044WFB": "DELIVERED",
     "0965341WFB": "DELIVERED",
     "0623521WFB": "DELIVERED",
-    "1285262WFB": "ARRIVED AT FEDEX LOCATION"
+    "1285262WFB": "DEPARTED FEDEX LOCATION"
   },
   "last_buybox_check": 1788330440
 }
