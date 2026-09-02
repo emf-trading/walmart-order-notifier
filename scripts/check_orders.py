@@ -70,6 +70,13 @@ BUYBOX_CHECK_INTERVAL_SECONDS = 30 * 60
 # side can't cause a missed notification.
 ORDER_LOOKBACK_HOURS = 24
 
+# A real order confirmed visible in Seller Center (order# 20001503812350,
+# dated 08/31/2026), used as a one-off sanity check: if the list endpoint
+# ever comes back empty, look this specific, known-real order up directly
+# by PO number. That sidesteps date-range/pagination entirely and answers
+# "can the API see ANY order data for this account at all?"
+KNOWN_REAL_ORDER_PO = "129124588259277"
+
 # Walmart's docs say report generation is normally 15-45 minutes. If a
 # pending request sits stuck (e.g. RECEIVED) far past that, stop waiting on
 # it forever and let the code request a fresh one instead.
@@ -225,6 +232,8 @@ def get_created_orders(access_token, limit=200):
             params={"limit": limit},
         )
         print(f"[orders] Diagnostic (no date filter, Walmart default window) status={diag_status}: {diag_body[:1000]}")
+       po_status, po_body, _ = http_request(f"{WALMART_BASE}/orders/{KNOWN_REAL_ORDER_PO}", headers=auth_headers(access_token))
+        print(f"[orders] Diagnostic (direct lookup of known real PO {KNOWN_REAL_ORDER_PO}) status={po_status}: {po_body[:1000]}")
     order_list = data.get("list", {}).get("elements", {}).get("order", [])
     if isinstance(order_list, dict):  # Walmart returns a bare object when there's exactly 1 order
         order_list = [order_list]
