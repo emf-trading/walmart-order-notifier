@@ -233,7 +233,7 @@ def get_created_orders(access_token, limit=200):
         )
         print(f"[orders] Diagnostic (no date filter, Walmart default window) status={diag_status}: {diag_body[:1000]}")
         po_status, po_body, _ = http_request(f"{WALMART_BASE}/orders/{KNOWN_REAL_ORDER_PO}", headers=auth_headers(access_token))
-        print(f"[orders] Diagnostic (direct lookup of known real PO {KNOWN_REAL_ORDER_PO}) status={po_status}: {po_body[:1000]}")
+        print(f"[orders] Diagnostic (direct lookup of known real PO {KNOWN_REAL_ORDER_PO}) status={po_status}: {po_body[:6000]}")
     order_list = data.get("list", {}).get("elements", {}).get("order", [])
     if isinstance(order_list, dict):  # Walmart returns a bare object when there's exactly 1 order
         order_list = [order_list]
