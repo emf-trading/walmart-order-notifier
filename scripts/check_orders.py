@@ -47,6 +47,7 @@ import csv
 import datetime as dt
 import io
 import json
+import re
 import os
 import pathlib
 import sys
@@ -631,18 +632,35 @@ def process_buybox(state, access_token, pushover_token, pushover_user):
 # ---------------------------------------------------------------------------
 
 def get_recon_report_diagnostic(access_token):
-    status, body, _ = http_request(f"{WALMART_BASE}/report/reconreport/reconFileJson", headers=auth_headers(access_token))
-    print(f"[recon] GET /report/reconreport/reconFileJson status={status}")
+    status, body, _ = http_request(f"{WALMART_BASE}/report/reconreport/availableReconFiles?reportVersion=v1", headers=auth_headers(access_token))
+    print(f"[recon] GET /report/reconreport/availableReconFiles status={status}")
     text = body.decode("utf-8", "replace")
-    print(f"[recon] Raw response (first 8000 chars): {text[:8000]}")
-    idx1 = text.find(KNOWN_REAL_ORDER_PO)
-    print(f"[recon] PO {KNOWN_REAL_ORDER_PO!r} found at offset {idx1}" if idx1 != -1 else f"[recon] PO {KNOWN_REAL_ORDER_PO!r} not found in this response.")
-    if idx1 != -1:
-        print(f"[recon] Context around PO match: {text[max(0, idx1-300):idx1+800]}")
-    idx2 = text.find("20001503812350")
-    print(f"[recon] Customer order 20001503812350 found at offset {idx2}" if idx2 != -1 else "[recon] Customer order 20001503812350 not found in this response.")
-    if idx2 != -1:
-        print(f"[recon] Context around customer-order match: {text[max(0, idx2-300):idx2+800]}")
+    print(f"[recon] Available dates raw response: {text[:3000]}")
+
+    dates = re.findall(r"\d{2}-\d{2}-\d{4}", text)
+    if not dates:
+        dates = re.findall(r"\d{4}-\d{2}-\d{2}", text)
+    dates = list(dict.fromkeys(dates))
+    print(f"[recon] Parsed {len(dates)} candidate report date(s): {dates}")
+
+    if not dates:
+        print("[recon] No available report dates found; cannot fetch reconFileJson.")
+        return
+
+    for report_date in dates[-8:]:
+        status2, body2, _ = http_request(f"{WALMART_BASE}/report/reconreport/reconFileJson?reportVersion=v1&reportDate={report_date}", headers=auth_headers(access_token))
+        text2 = body2.decode("utf-8", "replace")
+        print(f"[recon] GET reconFileJson reportDate={report_date} status={status2} length={len(text2)}")
+        idx1 = text2.find(KNOWN_REAL_ORDER_PO)
+        idx2 = text2.find("20001503812350")
+        if idx1 != -1 or idx2 != -1:
+            print(f"[recon] MATCH on {report_date}! PO found={idx1 != -1} CustomerOrder found={idx2 != -1}")
+            if idx1 != -1:
+                print(f"[recon] Context around PO match: {text2[max(0, idx1-300):idx1+1500]}")
+            if idx2 != -1:
+                print(f"[recon] Context around customer-order match: {text2[max(0, idx2-300):idx2+1500]}")
+        else:
+            print(f"[recon] No match on {report_date}. First 300 chars: {text2[:300]}")
 def main():
 
     client_id = os.environ["WALMART_CLIENT_ID"]
