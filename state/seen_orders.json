@@ -1,7 +1,7 @@
 {
   "seen_order_ids": [],
   "bootstrapped": true,
-  "last_run": 1788401319,
+  "last_run": 1788412762,
   "shipments_bootstrapped": true,
   "shipment_statuses": {
     "1194477WFB": "AWAITING_DELIVERY",
@@ -13,10 +13,11 @@
     "0623521WFB": "CLOSED",
     "0621220WFB": "CANCELLED",
     "1285262WFB": "AWAITING_DELIVERY",
-    "1490122WFB": "AWAITING_DELIVERY"
+    "1490122WFB": "AWAITING_DELIVERY",
+    "1492044WFB": "AWAITING_DELIVERY"
   },
-  "buybox_report_request_id": "01a06506-7cc0-7658-8ad5-b2678a298ce9",
-  "buybox_report_requested_at": 1788401318,
+  "buybox_report_request_id": null,
+  "buybox_report_requested_at": null,
   "shipment_tracking_bootstrapped": true,
   "shipment_tracking_statuses": {
     "1194477WFB": "DELIVERED",
@@ -27,7 +28,8 @@
     "0965341WFB": "DELIVERED",
     "0623521WFB": "DELIVERED",
     "1285262WFB": "DELIVERED",
-    "1490122WFB": "AWAITING_DELIVERY"
+    "1490122WFB": "PACKAGE DATA TRANSMITTED TO FEDEX",
+    "1492044WFB": "PACKAGE DATA TRANSMITTED TO FEDEX"
   },
-  "last_buybox_check": 1788398552
+  "last_buybox_check": 1788412762
 }
