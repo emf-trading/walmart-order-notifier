@@ -655,7 +655,7 @@ def get_recon_report_diagnostic(access_token):
 
     keywords = ("commission", "fee", "referral")
     for report_date in dates[-8:]:
-        status2, body2, _ = http_request(f"{WALMART_BASE}/report/reconreport/reconFileJson?reportVersion=v1&reportDate={report_date}&offset=0", headers=auth_headers(access_token))
+                status2, body2, _ = http_request(f"{WALMART_BASE}/report/reconreport/reconFileJson?reportVersion=v1&reportDate={report_date}&offset=0&noOfRecords=1000", headers=auth_headers(access_token))
         text2 = body2.decode("utf-8", "replace")
         print(f"[recon] GET reconFileJson reportDate={report_date} status={status2} length={len(text2)}")
         print(f"[recon] Raw response (first 4000 chars): {text2[:4000]}")
