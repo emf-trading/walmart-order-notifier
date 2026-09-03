@@ -645,11 +645,11 @@ def get_recon_report_diagnostic(access_token):
         print(f"[recon] Context around customer-order match: {text[max(0, idx2-300):idx2+800]}")
 def main():
 
-   client_id = os.environ["WALMART_CLIENT_ID"]
+    client_id = os.environ["WALMART_CLIENT_ID"]
     client_secret = os.environ["WALMART_CLIENT_SECRET"]
     pushover_token = os.environ["PUSHOVER_APP_TOKEN"]
     pushover_user = os.environ["PUSHOVER_USER_KEY"]
-
+   
     test_type = os.environ.get("TEST_TYPE", "").strip().lower()
     if not test_type and os.environ.get("TEST_NOTIFICATION", "false").lower() == "true":
         test_type = "generic"  # back-compat with the old boolean-only test flag
