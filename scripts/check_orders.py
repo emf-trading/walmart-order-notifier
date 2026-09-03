@@ -637,20 +637,28 @@ def get_recon_report_diagnostic(access_token):
     text = body.decode("utf-8", "replace")
     print(f"[recon] Available dates raw response: {text[:3000]}")
 
-    dates = re.findall(r"\d{2}-\d{2}-\d{4}", text)
-    if not dates:
-        dates = re.findall(r"\d{4}-\d{2}-\d{2}", text)
-    dates = list(dict.fromkeys(dates))
+    dates = []
+    try:
+        parsed = json.loads(text)
+        for key in ("availableApReportDates", "availableReconFileDates", "reportDates", "dates"):
+            value = parsed.get(key) if isinstance(parsed, dict) else None
+            if isinstance(value, list):
+                dates = value
+                break
+    except (json.JSONDecodeError, ValueError):
+        pass
     print(f"[recon] Parsed {len(dates)} candidate report date(s): {dates}")
 
     if not dates:
         print("[recon] No available report dates found; cannot fetch reconFileJson.")
         return
 
+    keywords = ("commission", "fee", "referral")
     for report_date in dates[-8:]:
         status2, body2, _ = http_request(f"{WALMART_BASE}/report/reconreport/reconFileJson?reportVersion=v1&reportDate={report_date}", headers=auth_headers(access_token))
         text2 = body2.decode("utf-8", "replace")
         print(f"[recon] GET reconFileJson reportDate={report_date} status={status2} length={len(text2)}")
+        print(f"[recon] Raw response (first 4000 chars): {text2[:4000]}")
         idx1 = text2.find(KNOWN_REAL_ORDER_PO)
         idx2 = text2.find("20001503812350")
         if idx1 != -1 or idx2 != -1:
@@ -660,7 +668,14 @@ def get_recon_report_diagnostic(access_token):
             if idx2 != -1:
                 print(f"[recon] Context around customer-order match: {text2[max(0, idx2-300):idx2+1500]}")
         else:
-            print(f"[recon] No match on {report_date}. First 300 chars: {text2[:300]}")
+            print(f"[recon] No match on {report_date} for the known order.")
+        lower_text = text2.lower()
+        for kw in keywords:
+            kw_idx = lower_text.find(kw)
+            if kw_idx != -1:
+                print(f"[recon] Found keyword '{kw}' at offset {kw_idx}: {text2[max(0, kw_idx-200):kw_idx+400]}")
+            else:
+                print(f"[recon] Keyword '{kw}' not found on {report_date}.")
 def main():
 
     client_id = os.environ["WALMART_CLIENT_ID"]
