@@ -659,7 +659,7 @@ def get_recon_report_diagnostic(access_token):
         text2 = body2.decode("utf-8", "replace")
         print(f"[recon] GET reconFileJson reportDate={report_date} status={status2} length={len(text2)}")
         print(f"[recon] Raw response (first 4000 chars): {text2[:4000]}")
-       idx1 = text2.find(KNOWN_REAL_ORDER_PO)
+        idx1 = text2.find(KNOWN_REAL_ORDER_PO)
         idx2 = text2.find("20001503812350")
         if idx1 != -1 or idx2 != -1:
             print(f"[recon] MATCH on {report_date}! PO found={idx1 != -1} CustomerOrder found={idx2 != -1}")
