@@ -623,8 +623,29 @@ def process_buybox(state, access_token, pushover_token, pushover_user):
         state["last_buybox_check"] = now
 
 
+# ---------------------------------------------------------------------------
+# Recon Report diagnostic (TEST_TYPE=recon) - one-off pull of the Recon
+# Report JSON to see what seller-side fee data (commission, WFS fees, etc.)
+# is actually available per order. The Orders API above only exposes what
+# the customer was charged, never what Walmart charged the seller.
+# ---------------------------------------------------------------------------
+
+def get_recon_report_diagnostic(access_token):
+    status, body, _ = http_request(f"{WALMART_BASE}/report/reconreport/reconFileJson", headers=auth_headers(access_token))
+    print(f"[recon] GET /report/reconreport/reconFileJson status={status}")
+    text = body.decode("utf-8", "replace")
+    print(f"[recon] Raw response (first 8000 chars): {text[:8000]}")
+    idx1 = text.find(KNOWN_REAL_ORDER_PO)
+    print(f"[recon] PO {KNOWN_REAL_ORDER_PO!r} found at offset {idx1}" if idx1 != -1 else f"[recon] PO {KNOWN_REAL_ORDER_PO!r} not found in this response.")
+    if idx1 != -1:
+        print(f"[recon] Context around PO match: {text[max(0, idx1-300):idx1+800]}")
+    idx2 = text.find("20001503812350")
+    print(f"[recon] Customer order 20001503812350 found at offset {idx2}" if idx2 != -1 else "[recon] Customer order 20001503812350 not found in this response.")
+    if idx2 != -1:
+        print(f"[recon] Context around customer-order match: {text[max(0, idx2-300):idx2+800]}")
 def main():
-    client_id = os.environ["WALMART_CLIENT_ID"]
+
+   client_id = os.environ["WALMART_CLIENT_ID"]
     client_secret = os.environ["WALMART_CLIENT_SECRET"]
     pushover_token = os.environ["PUSHOVER_APP_TOKEN"]
     pushover_user = os.environ["PUSHOVER_USER_KEY"]
@@ -632,6 +653,12 @@ def main():
     test_type = os.environ.get("TEST_TYPE", "").strip().lower()
     if not test_type and os.environ.get("TEST_NOTIFICATION", "false").lower() == "true":
         test_type = "generic"  # back-compat with the old boolean-only test flag
+
+    if test_type == "recon":
+        token = get_access_token(client_id, client_secret)
+        get_recon_report_diagnostic(token)
+        print("Recon report diagnostic complete.")
+        return
 
     if test_type and test_type != "none":
         send_sample_notification(pushover_token, pushover_user, test_type)
