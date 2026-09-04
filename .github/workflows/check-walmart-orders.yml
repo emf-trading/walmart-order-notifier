@@ -20,6 +20,7 @@ on:
           - shipment
           - generic
           - recon
+          - orderlookup
 # Prevent two runs from racing to read/write state/seen_orders.json if a run
 # ever takes longer than 5 minutes.
 concurrency:
