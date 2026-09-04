@@ -676,6 +676,53 @@ def get_recon_report_diagnostic(access_token):
                 print(f"[recon] Found keyword '{kw}' at offset {kw_idx}: {text2[max(0, kw_idx-200):kw_idx+400]}")
             else:
                 print(f"[recon] Keyword '{kw}' not found on {report_date}.")
+# ---------------------------------------------------------------------------
+# Per-order lookup (TEST_TYPE=orderlookup) - pulls real sale price / tax
+# straight from the Orders API for a fixed list of Walmart PO numbers, so we
+# don't have to wait on the lagged Recon Report for that part of the data.
+# ---------------------------------------------------------------------------
+
+ORDER_LOOKUP_POS = [
+    "119121310789819",
+    "119121310821983",
+    "129123154683810",
+    "129123256194801",
+    "129123155822325",
+    "129123363007026",
+    "129123363607857",
+    "129123469817481",
+    "129123471760101",
+    "129123471954048",
+    "129123572825033",
+    "129123573196489",
+    "129123574266382",
+    "129123574156706",
+    "129123574945372",
+    "129123678925702",
+    "129123783213490",
+    "129123783588797",
+    "119123714824356",
+    "119123714692881",
+    "119123817733079",
+    "119123818001499",
+    "119123821510851",
+    "119123821348519",
+    "129124588259277",
+    "129124698672455",
+    "129124710420198",
+    "129124712840557",
+    "129124713054540",
+]
+
+
+def get_order_lookup_diagnostic(access_token):
+    for po in ORDER_LOOKUP_POS:
+        status, body, _ = http_request(f"{WALMART_BASE}/orders/{po}", headers=auth_headers(access_token))
+        text = body.decode("utf-8", "replace")
+        print(f"[orderlookup] PO={po} status={status} length={len(text)}")
+        print(f"[orderlookup] Raw response: {text[:6000]}")
+
+
 def main():
 
     client_id = os.environ["WALMART_CLIENT_ID"]
@@ -691,6 +738,12 @@ def main():
         token = get_access_token(client_id, client_secret)
         get_recon_report_diagnostic(token)
         print("Recon report diagnostic complete.")
+        return
+
+    if test_type == "orderlookup":
+        token = get_access_token(client_id, client_secret)
+        get_order_lookup_diagnostic(token)
+        print("Order lookup diagnostic complete.")
         return
 
     if test_type and test_type != "none":
