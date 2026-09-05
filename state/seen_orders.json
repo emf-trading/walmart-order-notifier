@@ -1,12 +1,12 @@
 {
   "seen_order_ids": [],
   "bootstrapped": true,
-  "last_run": 1788619847,
+  "last_run": 1788620469,
   "shipments_bootstrapped": true,
   "shipment_statuses": {
     "1194477WFB": "AWAITING_DELIVERY",
     "1145367WFB": "CLOSED",
-    "1144418WFB": "AWAITING_DELIVERY",
+    "1144418WFB": "CLOSED",
     "1142817WFB": "RECEIVING_IN_PROGRESS",
     "1009044WFB": "RECEIVING_IN_PROGRESS",
     "0965341WFB": "RECEIVING_IN_PROGRESS",
