@@ -1,10 +1,10 @@
 {
   "seen_order_ids": [],
   "bootstrapped": true,
-  "last_run": 1788785723,
+  "last_run": 1788786730,
   "shipments_bootstrapped": true,
   "shipment_statuses": {
-    "1194477WFB": "AWAITING_DELIVERY",
+    "1194477WFB": "CLOSED",
     "1145367WFB": "CLOSED",
     "1144418WFB": "CLOSED",
     "1142817WFB": "CLOSED",
@@ -35,5 +35,5 @@
     "1550254WFB": "Arriving Early at Vehicle",
     "1550629WFB": "Arriving Early at Vehicle"
   },
-  "last_buybox_check": 1788784747
+  "last_buybox_check": 1788786729
 }
