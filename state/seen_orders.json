@@ -1,7 +1,7 @@
 {
   "seen_order_ids": [],
   "bootstrapped": true,
-  "last_run": 1789043959,
+  "last_run": 1789044926,
   "shipments_bootstrapped": true,
   "shipment_statuses": {
     "1194477WFB": "CLOSED",
@@ -19,8 +19,8 @@
     "1550629WFB": "AWAITING_DELIVERY",
     "1774806WFB": "AWAITING_DELIVERY"
   },
-  "buybox_report_request_id": null,
-  "buybox_report_requested_at": null,
+  "buybox_report_request_id": "01a08b63-2704-76d3-9739-0bf46c4cccab",
+  "buybox_report_requested_at": 1789044925,
   "shipment_tracking_bootstrapped": true,
   "shipment_tracking_statuses": {
     "1194477WFB": "DELIVERED",
