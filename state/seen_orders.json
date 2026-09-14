@@ -1,7 +1,7 @@
 {
   "seen_order_ids": [],
   "bootstrapped": true,
-  "last_run": 1789378033,
+  "last_run": 1789379012,
   "shipments_bootstrapped": true,
   "shipment_statuses": {
     "1194477WFB": "CLOSED",
@@ -23,8 +23,8 @@
     "1913772WFB": "AWAITING_DELIVERY",
     "1919565WFB": "AWAITING_DELIVERY"
   },
-  "buybox_report_request_id": "01a09f3d-f7f2-75c4-8259-44e52163c593",
-  "buybox_report_requested_at": 1789378033,
+  "buybox_report_request_id": null,
+  "buybox_report_requested_at": null,
   "shipment_tracking_bootstrapped": true,
   "shipment_tracking_statuses": {
     "1194477WFB": "DELIVERED",
@@ -45,5 +45,5 @@
     "1913772WFB": "Arriving Early at FedEx Facility",
     "1919565WFB": "Arriving On-time at Destination FedEx Facility"
   },
-  "last_buybox_check": 1789375989
+  "last_buybox_check": 1789379011
 }
