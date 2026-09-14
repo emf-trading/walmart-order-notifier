@@ -1,7 +1,7 @@
 {
   "seen_order_ids": [],
   "bootstrapped": true,
-  "last_run": 1789375067,
+  "last_run": 1789375989,
   "shipments_bootstrapped": true,
   "shipment_statuses": {
     "1194477WFB": "CLOSED",
@@ -45,5 +45,5 @@
     "1913772WFB": "Arriving Early at FedEx Facility",
     "1919565WFB": "Arriving On-time at Destination FedEx Facility"
   },
-  "last_buybox_check": 1789374095
+  "last_buybox_check": 1789375989
 }
