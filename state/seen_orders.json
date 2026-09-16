@@ -1,7 +1,7 @@
 {
   "seen_order_ids": [],
   "bootstrapped": true,
-  "last_run": 1789529572,
+  "last_run": 1789530446,
   "shipments_bootstrapped": true,
   "shipment_statuses": {
     "1194477WFB": "CLOSED",
@@ -57,5 +57,5 @@
     "2021334WFB": "PACKAGE DATA TRANSMITTED TO FEDEX",
     "2021404WFB": "PACKAGE DATA TRANSMITTED TO FEDEX"
   },
-  "last_buybox_check": 1789528619
+  "last_buybox_check": 1789530445
 }
