@@ -1,7 +1,7 @@
 {
   "seen_order_ids": [],
   "bootstrapped": true,
-  "last_run": 1789636606,
+  "last_run": 1789637590,
   "shipments_bootstrapped": true,
   "shipment_statuses": {
     "1194477WFB": "CLOSED",
@@ -57,5 +57,5 @@
     "2021334WFB": "DEPARTED FEDEX LOCATION",
     "2021404WFB": "DEPARTED FEDEX LOCATION"
   },
-  "last_buybox_check": 1789635498
+  "last_buybox_check": 1789637590
 }
