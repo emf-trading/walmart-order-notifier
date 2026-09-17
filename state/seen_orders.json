@@ -1,7 +1,7 @@
 {
   "seen_order_ids": [],
   "bootstrapped": true,
-  "last_run": 1789637590,
+  "last_run": 1789638452,
   "shipments_bootstrapped": true,
   "shipment_statuses": {
     "1194477WFB": "CLOSED",
@@ -51,11 +51,11 @@
     "1913772WFB": "DELIVERED",
     "1919565WFB": "DELIVERED",
     "1985760WFB": "ARRIVED AT FEDEX LOCATION",
-    "1987239WFB": "ARRIVED AT FEDEX LOCATION",
-    "1987675WFB": "ARRIVED AT FEDEX LOCATION",
+    "1987239WFB": "Arrived at Destination Hub",
+    "1987675WFB": "Arrived at Destination Hub",
     "2018766WFB": "PACKAGE DATA TRANSMITTED TO FEDEX",
-    "2021334WFB": "DEPARTED FEDEX LOCATION",
-    "2021404WFB": "DEPARTED FEDEX LOCATION"
+    "2021334WFB": "ARRIVED AT FEDEX LOCATION",
+    "2021404WFB": "ARRIVED AT FEDEX LOCATION"
   },
   "last_buybox_check": 1789637590
 }
