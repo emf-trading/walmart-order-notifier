@@ -1,7 +1,7 @@
 {
   "seen_order_ids": [],
   "bootstrapped": true,
-  "last_run": 1789745239,
+  "last_run": 1789746125,
   "shipments_bootstrapped": true,
   "shipment_statuses": {
     "1194477WFB": "CLOSED",
@@ -65,5 +65,5 @@
     "2121909WFB": "IN FEDEX POSSESSION",
     "2121903WFB": "IN FEDEX POSSESSION"
   },
-  "last_buybox_check": 1789744313
+  "last_buybox_check": 1789746124
 }
