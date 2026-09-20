@@ -410,32 +410,52 @@ def check_shipment_tracking(state, access_token, pushover_token, pushover_user, 
             continue
         total_records += len(records)
 
+        # One shipment can have many parcels (boxes), each its own record with
+        # its own status. Group them so we track ONE status per shipment.
+        # (Keying state by shipment ID per record made parcels overwrite each
+        # other, so mixed statuses looked like a change on every run.)
+        by_shipment = {}
         for record in records:
             record_shipment_id = str(record.get("shipmentId") or shipment_id)
-            current_status = str(
-                record.get("status") or record.get("trackingStatus") or record.get("shipmentStatus") or "UNKNOWN"
-            )
+            by_shipment.setdefault(record_shipment_id, []).append(record)
+
+        for record_shipment_id, group in by_shipment.items():
+            counts = {}
+            for record in group:
+                st = str(
+                    record.get("status") or record.get("trackingStatus") or record.get("shipmentStatus") or "UNKNOWN"
+                )
+                counts[st] = counts.get(st, 0) + 1
+            if len(counts) == 1:
+                current_status = next(iter(counts))
+            else:
+                # Mixed parcels, e.g. "6 DELIVERED, 4 IN TRANSIT". Sorted so the
+                # string is stable regardless of record order in the response.
+                current_status = ", ".join(f"{n} {s}" for s, n in sorted(counts.items()))
 
             prev_status = prev_tracking.get(record_shipment_id)
             new_tracking[record_shipment_id] = current_status
 
             if first_run:
                 continue  # bootstrap: record but don't notify
+            if prev_status == current_status:
+                continue
 
-            if prev_status is not None and prev_status != current_status:
-                tracking_no = record.get("trackingNo") or record.get("trackingNumber") or "n/a"
-                carrier = record.get("carrierName") or record.get("carrier") or ""
-                message = f"Shipment {record_shipment_id}: {prev_status} -> {current_status}"
-                if tracking_no != "n/a":
-                    message += f"\nTracking: {tracking_no}"
+            master = next((r for r in group if r.get("isMaster")), group[0])
+            tracking_no = master.get("trackingNo") or master.get("trackingNumber") or "n/a"
+            carrier = master.get("carrierName") or master.get("carrier") or ""
+            parcels = f" ({len(group)} parcels)" if len(group) > 1 else ""
+
+            if prev_status is not None:
+                message = f"Shipment {record_shipment_id}{parcels}: {prev_status} -> {current_status}"
+            else:
+                message = f"New tracked shipment {record_shipment_id}{parcels}: status {current_status}"
+            if tracking_no != "n/a":
+                message += f"\nTracking: {tracking_no}"
                 if carrier:
                     message += f" ({carrier})"
-                send_pushover(pushover_token, pushover_user, "Inbound shipment update", message, sound="pushover")
-                print(f"[tracking] Notified: {record_shipment_id} {prev_status} -> {current_status}")
-            elif prev_status is None:
-                message = f"New tracked shipment {record_shipment_id}: status {current_status}"
-                send_pushover(pushover_token, pushover_user, "Inbound shipment update", message, sound="pushover")
-                print(f"[tracking] Notified: new shipment {record_shipment_id} ({current_status})")
+            send_pushover(pushover_token, pushover_user, "Inbound shipment update", message, sound="pushover")
+            print(f"[tracking] Notified: {record_shipment_id} {prev_status} -> {current_status}")
 
     print(f"[tracking] Fetched tracking for {len(shipment_ids)} shipment id(s), {total_records} record(s) total.")
 
