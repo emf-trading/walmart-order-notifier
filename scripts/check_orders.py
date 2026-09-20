@@ -28,7 +28,7 @@ Env vars required:
     PUSHOVER_USER_KEY
 
 Optional:
-    TEST_TYPE=orders|buybox|shipment|generic
+    TEST_TYPE=orders|buybox|shipment|fedex|generic
         -> send one realistic sample push of that type and exit (no Walmart
            call). Lets you check wording/sound for each notification kind
            on demand instead of waiting for a real event. "generic" (or
@@ -190,9 +190,14 @@ SAMPLE_NOTIFICATIONS = {
         "pushover",
     ),
     "shipment": (
-        "Inbound shipment update",
-        "Shipment TEST-SHIP-456: In Transit -> Arrived\nTracking: 1Z999AA10123456784",
+        "WFS Shipment: CLOSED",
+        "Shipment TEST-SHIP-456: RECEIVING_IN_PROGRESS -> CLOSED\nTracking: n/a",
         "pushover",
+    ),
+    "fedex": (
+        "FedEx: DELIVERED",
+        "Shipment TEST-SHIP-456 (2 parcels): 1 ARRIVED AT FEDEX LOCATION, 1 DELIVERED -> DELIVERED\nTracking: 1Z999AA10123456784 (FedEx)",
+        "tugboat",
     ),
     "generic": (
         "Test notification",
@@ -339,12 +344,12 @@ def check_inbound_shipments(state, access_token, pushover_token, pushover_user):
         if prev_status is not None and prev_status != current_status:
             tracking = shipment.get("trackingNo") or shipment.get("trackingNumber") or "n/a"
             message = f"Shipment {shipment_id}: {prev_status} -> {current_status}\nTracking: {tracking}"
-            send_pushover(pushover_token, pushover_user, "Inbound shipment update", message, sound="pushover")
+            send_pushover(pushover_token, pushover_user, f"WFS Shipment: {current_status.replace('_', ' ')}", message, sound="pushover")
             print(f"[shipments] Notified: {shipment_id} {prev_status} -> {current_status}")
         elif prev_status is None:
             # A shipment that showed up after bootstrap - new info worth a push.
             message = f"New inbound shipment {shipment_id}: status {current_status}"
-            send_pushover(pushover_token, pushover_user, "Inbound shipment update", message, sound="pushover")
+            send_pushover(pushover_token, pushover_user, f"WFS Shipment: {current_status.replace('_', ' ')}", message, sound="pushover")
             print(f"[shipments] Notified: new shipment {shipment_id} ({current_status})")
 
     if first_run:
@@ -454,7 +459,7 @@ def check_shipment_tracking(state, access_token, pushover_token, pushover_user, 
                 message += f"\nTracking: {tracking_no}"
                 if carrier:
                     message += f" ({carrier})"
-            send_pushover(pushover_token, pushover_user, "Inbound shipment update", message, sound="pushover")
+            send_pushover(pushover_token, pushover_user, f"FedEx: {current_status}", message, sound="tugboat")
             print(f"[tracking] Notified: {record_shipment_id} {prev_status} -> {current_status}")
 
     print(f"[tracking] Fetched tracking for {len(shipment_ids)} shipment id(s), {total_records} record(s) total.")
