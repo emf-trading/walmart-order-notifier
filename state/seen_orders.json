@@ -1,10 +1,10 @@
 {
   "seen_order_ids": [
-    "129126511134410",
-    "129126499981913"
+    "129126499981913",
+    "129126511134410"
   ],
   "bootstrapped": true,
-  "last_run": 1789954519,
+  "last_run": 1789955286,
   "shipments_bootstrapped": true,
   "shipment_statuses": {
     "1194477WFB": "CLOSED",
