@@ -1,13 +1,13 @@
 {
   "seen_order_ids": [
     "129126828316666",
-    "129126499981913",
     "129126511565344",
     "129126619833282",
-    "129126511134410"
+    "129126511134410",
+    "129126499981913"
   ],
   "bootstrapped": true,
-  "last_run": 1790297790,
+  "last_run": 1790298683,
   "shipments_bootstrapped": true,
   "shipment_statuses": {
     "1194477WFB": "CLOSED",
@@ -44,8 +44,8 @@
     "2219309WFB": "AWAITING_DELIVERY",
     "2221924WFB": "AWAITING_DELIVERY"
   },
-  "buybox_report_request_id": "01a0d610-552a-7ef6-8c8b-e51edf4acb35",
-  "buybox_report_requested_at": 1790297789,
+  "buybox_report_request_id": null,
+  "buybox_report_requested_at": null,
   "shipment_tracking_bootstrapped": true,
   "shipment_tracking_statuses": {
     "1194477WFB": "DELIVERED",
@@ -81,5 +81,5 @@
     "2219309WFB": "DELIVERED",
     "2221924WFB": "DELIVERED"
   },
-  "last_buybox_check": 1790295783
+  "last_buybox_check": 1790298682
 }
