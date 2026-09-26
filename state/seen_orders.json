@@ -1,13 +1,13 @@
 {
   "seen_order_ids": [
-    "129126511565344",
+    "129126619833282",
     "129126828316666",
     "129126499981913",
-    "129126619833282",
-    "129126511134410"
+    "129126511134410",
+    "129126511565344"
   ],
   "bootstrapped": true,
-  "last_run": 1790408435,
+  "last_run": 1790409100,
   "shipments_bootstrapped": true,
   "shipment_statuses": {
     "1194477WFB": "CLOSED",
@@ -83,5 +83,5 @@
     "2221924WFB": "DELIVERED",
     "2441156WFB": "PACKAGE DATA TRANSMITTED TO FEDEX"
   },
-  "last_buybox_check": 1790406723
+  "last_buybox_check": 1790409100
 }
