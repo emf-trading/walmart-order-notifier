@@ -1,20 +1,20 @@
 {
   "seen_order_ids": [
-    "129126511565344",
-    "129127251894877",
     "129126511134410",
-    "129127353085956",
-    "129127355862160",
-    "129127038060971",
     "129126619833282",
+    "129127036746406",
+    "129127038060971",
+    "129127037881936",
+    "129126511565344",
     "129127145193199",
+    "129127355862160",
+    "129127251894877",
     "129126499981913",
     "129126828316666",
-    "129127036746406",
-    "129127037881936"
+    "129127353085956"
   ],
   "bootstrapped": true,
-  "last_run": 1790709253,
+  "last_run": 1790722816,
   "shipments_bootstrapped": true,
   "shipment_statuses": {
     "1194477WFB": "CLOSED",
@@ -52,10 +52,11 @@
     "2221924WFB": "RECEIVING_IN_PROGRESS",
     "2441156WFB": "AWAITING_DELIVERY",
     "2570123WFB": "AWAITING_DELIVERY",
-    "2569398WFB": "AWAITING_DELIVERY"
+    "2569398WFB": "AWAITING_DELIVERY",
+    "2579643WFB": "AWAITING_DELIVERY"
   },
-  "buybox_report_request_id": null,
-  "buybox_report_requested_at": null,
+  "buybox_report_request_id": "01a0ef65-bafd-7ba8-a900-1c8b72c4cbba",
+  "buybox_report_requested_at": 1790722816,
   "shipment_tracking_bootstrapped": true,
   "shipment_tracking_statuses": {
     "1194477WFB": "DELIVERED",
@@ -91,8 +92,9 @@
     "2219309WFB": "DELIVERED",
     "2221924WFB": "DELIVERED",
     "2441156WFB": "DEPARTED FEDEX LOCATION",
-    "2570123WFB": "PACKAGE DATA TRANSMITTED TO FEDEX",
-    "2569398WFB": "PACKAGE DATA TRANSMITTED TO FEDEX"
+    "2570123WFB": "PICKED UP",
+    "2569398WFB": "IN FEDEX POSSESSION",
+    "2579643WFB": "PACKAGE DATA TRANSMITTED TO FEDEX"
   },
   "last_buybox_check": 1790709253
 }
