@@ -1,23 +1,24 @@
 {
   "seen_order_ids": [
-    "129127038060971",
     "129126499981913",
-    "129126511565344",
-    "129126828316666",
+    "129127036746406",
     "129127353085956",
-    "129126619833282",
-    "129127355862160",
     "129127776757391",
     "129127037881936",
-    "129127145193199",
-    "129127778414025",
-    "129127036746406",
     "129126511134410",
+    "129127778414025",
+    "129126511565344",
+    "129127355862160",
+    "129127038060971",
+    "129126619833282",
     "129127251894877",
-    "129127462463719"
+    "129127145193199",
+    "129127462463719",
+    "129126828316666",
+    "129127883627912"
   ],
   "bootstrapped": true,
-  "last_run": 1791144169,
+  "last_run": 1791154877,
   "shipments_bootstrapped": true,
   "shipment_statuses": {
     "1194477WFB": "CLOSED",
@@ -60,8 +61,8 @@
     "2681782WFB": "AWAITING_DELIVERY",
     "2740897WFB": "PENDING_SHIPMENT_DETAILS"
   },
-  "buybox_report_request_id": null,
-  "buybox_report_requested_at": null,
+  "buybox_report_request_id": "01a10926-71fd-7738-992f-cceb4b4e2c2a",
+  "buybox_report_requested_at": 1791154876,
   "shipment_tracking_bootstrapped": true,
   "shipment_tracking_statuses": {
     "1194477WFB": "DELIVERED",
@@ -100,7 +101,7 @@
     "2570123WFB": "DELIVERED",
     "2569398WFB": "DELIVERED",
     "2579643WFB": "DEPARTED FEDEX LOCATION",
-    "2681782WFB": "Arriving On-time at Vehicle"
+    "2681782WFB": "ARRIVED AT FEDEX LOCATION"
   },
   "last_buybox_check": 1791144169
 }
