@@ -1,24 +1,24 @@
 {
   "seen_order_ids": [
-    "129127037881936",
-    "129126511134410",
-    "129127251894877",
-    "129127883627912",
-    "129127462463719",
-    "129127776757391",
-    "129126619833282",
-    "129126511565344",
-    "129127353085956",
-    "129127145193199",
-    "129127355862160",
     "129126499981913",
     "129127778414025",
-    "129127036746406",
+    "129126828316666",
+    "129126511134410",
+    "129127145193199",
+    "129126511565344",
+    "129127251894877",
+    "129127462463719",
+    "129127037881936",
+    "129127353085956",
     "129127038060971",
-    "129126828316666"
+    "129127036746406",
+    "129126619833282",
+    "129127776757391",
+    "129127883627912",
+    "129127355862160"
   ],
   "bootstrapped": true,
-  "last_run": 1791165034,
+  "last_run": 1791186284,
   "shipments_bootstrapped": true,
   "shipment_statuses": {
     "1194477WFB": "CLOSED",
@@ -59,10 +59,10 @@
     "2569398WFB": "AWAITING_DELIVERY",
     "2579643WFB": "AWAITING_DELIVERY",
     "2681782WFB": "AWAITING_DELIVERY",
-    "2740897WFB": "PENDING_SHIPMENT_DETAILS"
+    "2740897WFB": "CLOSED"
   },
-  "buybox_report_request_id": null,
-  "buybox_report_requested_at": null,
+  "buybox_report_request_id": "01a10b05-ae96-761a-9e33-547a351ce76d",
+  "buybox_report_requested_at": 1791186284,
   "shipment_tracking_bootstrapped": true,
   "shipment_tracking_statuses": {
     "1194477WFB": "DELIVERED",
